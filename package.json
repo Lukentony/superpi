@@ -1,0 +1,19 @@
+{
+  "name": "superpi",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A control plane for AI coding agent sessions: spawns, observes, and manages Pi coding agent children with a terminal-styled web interface.",
+  "license": "MIT",
+  "author": "Luca Rivoiro",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "verify": "node scripts/passo0-rpcclient.mjs && node scripts/test-fase1.mjs && node scripts/test-fase2.mjs && node scripts/test-fase4.mjs && node scripts/test-fase5.mjs && node scripts/test-fase6.mjs",
+    "serve": "bash scripts/serve.sh"
+  },
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.84.1"
+  }
+}

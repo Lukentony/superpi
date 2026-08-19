@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="__CSRF__">
+<title>superPi — v2</title>
+<style>
+  :root { --bg:#0c0e12; --fg:#b8c4cc; --verde:#7ec699; --ambra:#e5c07b; --rosso:#e06c75; --grigio:#5c6770; --blu:#61afef; --bordo:#2a3138; }
+  * { box-sizing: border-box; }
+  body { background:var(--bg); color:var(--fg); font-family:ui-monospace, Menlo, Consolas, monospace; font-size:14px; margin:0 auto; padding:16px; max-width:900px; }
+  h1 { font-size:16px; color:var(--verde); margin:0 0 2px; }
+  #stato { color:var(--grigio); font-size:12px; margin-bottom:12px; min-height:16px; }
+  form { border:1px solid var(--bordo); padding:10px; margin-bottom:12px; }
+  label { display:block; margin:6px 0 2px; color:var(--grigio); font-size:12px; }
+  textarea, input[type=text] { width:100%; background:#151a21; color:var(--fg); border:1px solid var(--bordo); font:inherit; padding:6px; }
+  textarea { min-height:60px; resize:vertical; }
+  button { background:#1c232b; color:var(--verde); border:1px solid var(--bordo); font:inherit; padding:6px 12px; cursor:pointer; margin:4px 6px 0 0; }
+  button:hover { border-color:var(--verde); }
+  button.rifiuta { color:var(--rosso); }
+  button:disabled { color:var(--grigio); cursor:default; border-color:var(--bordo); }
+  .errore-form { color:var(--rosso); font-size:12px; margin-left:8px; }
+  /* Navigazione: Home/Sessioni + schede conversazione (multi, 2026-08-13).
+     Colori schede: blu=in_corso, ambra=dialogo in sospeso, grigio=in_attesa,
+     verde=finito, rosso=errore (stessa semantica delle finestre tmux). */
+  nav { display:flex; align-items:center; gap:6px; flex-wrap:wrap; border-bottom:1px solid var(--bordo); padding-bottom:8px; margin-bottom:14px; }
+  nav button { color:var(--grigio); margin:0; }
+  nav button.attiva { color:var(--verde); border-color:var(--verde); background:#16241d; }
+  nav .nav-sep { border-left:1px solid var(--bordo); height:18px; margin:0 4px; }
+  nav .scheda-conv { display:inline-flex; align-items:center; gap:6px; max-width:220px; padding:4px 8px; border:1px solid var(--bordo); color:var(--grigio); background:#10151b; }
+  nav .scheda-conv .nome { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  nav .scheda-conv .chiudi { color:var(--grigio); border:none; background:none; padding:0 2px; margin:0; cursor:pointer; font-size:13px; }
+  nav .scheda-conv .chiudi:hover { color:var(--rosso); }
+  nav .scheda-conv.stato-in_corso { color:var(--blu); border-color:var(--blu); }
+  nav .scheda-conv.stato-in_attesa { color:var(--grigio); }
+  nav .scheda-conv.stato-dialogo { color:var(--ambra); border-color:var(--ambra); }
+  nav .scheda-conv.stato-finito { color:var(--verde); border-color:var(--verde); }
+  nav .scheda-conv.stato-errore { color:var(--rosso); border-color:var(--rosso); }
+  nav .scheda-conv.attiva { background:#16241d; }
+  section { margin-bottom:16px; }
+  #vista-sessioni { border-top:1px solid var(--bordo); padding-top:12px; }
+  #pannello-sessioni { border:1px solid var(--bordo); padding:10px; }
+  #pannello-sessioni h2 { font-size:13px; color:var(--verde); margin:0 0 6px; }
+  #pannello-sessioni .nota { color:var(--grigio); font-size:11px; margin-bottom:6px; }
+  .voce-sessione { border:1px solid var(--bordo); padding:6px; margin:6px 0; }
+  .voce-sessione .testa { font-size:12px; margin-bottom:2px; }
+  .voce-sessione .snippet { font-size:11px; color:var(--grigio); white-space:pre-wrap; word-break:break-all; margin:4px 0; }
+  .voce-sessione .motivo { color:var(--grigio); font-size:11px; font-style:italic; }
+  /* Vista chat di una conversazione (per-conversazione): il contenitore log
+     tiene un blocco per conversazione, visibile solo per quella attiva. */
+  #chat-head { font-size:12px; color:var(--grigio); margin-bottom:6px; }
+  #chat-head .nome { color:var(--verde); }
+  #log-conv { border:1px solid var(--bordo); padding:8px; min-height:200px; max-height:55vh; overflow-y:auto; background:#0a0d11; margin-top:12px; }
+  .log-conv { display:none; }
+  .log-conv.attiva { display:block; }
+  .grezzo { font-size:12px; word-break:break-all; white-space:pre-wrap; margin:2px 0; }
+  /* La risposta a parole del figlio (fix 2026-08-16): non è una riga di log
+     tecnico come il grezzo — si legge come un messaggio. Verifica visiva di Luca. */
+  .risposta { white-space:pre-wrap; word-break:break-word; margin:8px 0; padding:6px 10px; background:#10161d; border-left:3px solid var(--verde); color:var(--fg); }
+  .risposta .quando { color:var(--grigio); font-size:11px; display:block; margin-bottom:2px; }
+  /* Il messaggio dell'utente (2026-08-18): terzo stile, distinto sia dal grezzo
+     tecnico sia dalla risposta del figlio — bordo azzurro (risposta=verde),
+     stesso tono minimale/terminale. */
+  .utente { white-space:pre-wrap; word-break:break-word; margin:8px 0; padding:6px 10px; background:#11151c; border-left:3px solid var(--blu); color:var(--fg); }
+  .utente .quando { color:var(--grigio); font-size:11px; display:block; margin-bottom:2px; }
+  .dialogo { border:1px solid var(--ambra); padding:8px; margin:10px 0; }
+  .dialogo .titolo { color:var(--ambra); font-size:12px; }
+  .dialogo .msg { white-space:pre-wrap; color:var(--fg); margin:4px 0; }
+  .dialogo .esito { color:var(--grigio); font-size:12px; margin-top:4px; }
+  .condensato { border:1px solid var(--verde); padding:8px; margin:10px 0; }
+  .condensato .titolo { color:var(--verde); font-size:12px; margin-bottom:4px; }
+  .condensato div { margin:2px 0; word-break:break-word; }
+  .bloccato { color:var(--rosso); }
+  .errore { color:var(--rosso); }
+</style>
+</head>
+<body>
+<h1>superPi — v2</h1>
+<div id="stato">nessuna conversazione aperta</div>
+
+<nav id="nav">
+  <button type="button" data-vista="home" class="attiva">Home</button>
+  <button type="button" data-vista="sessioni">Sessioni</button>
+  <span class="nav-sep"></span>
+  <span id="schede-conv"></span>
+</nav>
+
+<section id="vista-home">
+<form id="form-compito">
+  <label for="obiettivo">Obiettivo</label>
+  <textarea id="obiettivo" placeholder="Descrivi il compito per il figlio..."></textarea>
+  <label for="cwd">Cartella di lavoro (cwd) del figlio</label>
+  <input type="text" id="cwd" value="lavori-superpi" title="Default: una sottocartella dedicata in ~/lavori-superpi viene creata per questa conversazione. Svuota il campo per il default, o scrivi un percorso esplicito.">
+  <button type="submit">Avvia compito</button>
+  <span class="errore-form" id="errore-form"></span>
+</form>
+<p style="color:var(--grigio);font-size:12px">Ogni compito avviato diventa una scheda in cima. Le schede si colorano da sole: <span style="color:var(--blu)">blu</span> = sta lavorando, <span style="color:var(--ambra)">ambra</span> = serve una tua risposta (dialogo in sospeso), <span style="color:var(--grigio)">grigio</span> = in attesa, <span style="color:var(--verde)">verde</span> = finito, <span style="color:var(--rosso)">rosso</span> = errore.</p>
+</section>
+
+<section id="vista-sessioni" hidden>
+<div id="pannello-sessioni">
+  <h2>Sessioni esistenti</h2>
+  <div class="nota" id="nota-sessioni">Sola lettura — aggiornamento manuale, nessun polling automatico.</div>
+  <label for="msg-ripresa" style="font-size:12px;color:var(--grigio)">Messaggio iniziale per la ripresa (opzionale — arriva DOPO il sunto)</label>
+  <input type="text" id="msg-ripresa" placeholder="es. riprendi da dove eri e riassumi il contesto">
+  <button type="button" id="btn-aggiorna-sessioni">Aggiorna sessioni</button>
+  <span class="errore-form" id="errore-sessioni"></span>
+  <div id="elenco-sessioni"></div>
+</div>
+</section>
+
+<section id="vista-chat" hidden>
+  <div id="chat-head"></div>
+  <div id="log-conv"></div>
+  <div id="chat" style="display:none">
+    <label for="msg-chat">Messaggio al figlio</label>
+    <input type="text" id="msg-chat" placeholder="scrivi il prossimo messaggio...">
+    <button type="button" id="btn-invia">Invia</button>
+    <button type="button" id="btn-termina" class="rifiuta" style="margin-left:12px">Termina compito</button>
+    <span class="errore-form" id="errore-chat"></span>
+  </div>
+</section>
+
+<script>
+"use strict";
+const TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+const statoEl = document.getElementById("stato");
+const form = document.getElementById("form-compito");
+const schedeEl = document.getElementById("schede-conv");
+
+// Stato multi-conversazione (2026-08-13): una scheda per conversazione,
+// colorata secondo lo stato. Lo stream completo /eventi/<id> è aperto SOLO
+// per la conversazione che si sta guardando; /eventi-globali (unico, sempre
+// aperto) aggiorna i colori di tutte le schede.
+let convAttiva = null;            // taskId della conversazione aperta (o null)
+const esPerConv = new Map();      // taskId -> EventSource dello stream completo
+const logPerConv = new Map();     // taskId -> elemento .log-conv
+// Dedup alla riapertura di una scheda (2026-08-18): lo snapshot di /eventi/<id>
+// rimanda ultimaRisposta (stesso ts) e i dialoghi in sospeso (stesso id) — se
+// il log non si svuota, verrebbero aggiunti una seconda volta. Traccio cosa è
+// già stato mostrato per conversazione e non lo riaggiungo.
+const risposteMostrate = new Map(); // taskId -> Set(ts)
+const dialoghiMostrati = new Map(); // taskId -> Set(id dialog)
+let esGlobale = null;
+
+function coloreScheda(stato, dialogoInSospeso) {
+  // ambra = dialogo in sospeso in QUALSIASI stato: il figlio sta aspettando
+  // la risposta (anche in_corso) — è il caso più urgente da notare.
+  if (dialogoInSospeso) return "stato-dialogo";
+  if (stato === "in_corso") return "stato-in_corso";
+  if (stato === "in_attesa") return "stato-in_attesa";
+  if (stato === "finito") return "stato-finito";
+  if (stato === "errore") return "stato-errore";
+  return "";
+}
+
+function creaScheda(taskId, nome) {
+  let s = document.getElementById(`scheda-${taskId}`);
+  if (s) return s;
+  s = document.createElement("button");
+  s.type = "button";
+  s.id = `scheda-${taskId}`;
+  s.className = "scheda-conv";
+  const span = document.createElement("span");
+  span.className = "nome";
+  span.textContent = nome || taskId.slice(0, 8);
+  const x = document.createElement("span");
+  x.className = "chiudi";
+  x.textContent = "×";
+  x.title = "Scarta la conversazione (solo se finita o in errore)";
+  x.onclick = (ev) => { ev.stopPropagation(); scartaConversazione(taskId); };
+  s.append(span, x);
+  s.onclick = () => apriConversazione(taskId);
+  schedeEl.appendChild(s);
+  // il conduttore è una scheda FISSA: niente ×, mai scartabile
+  if (taskId === "conduttore") x.style.display = "none";
+  return s;
+}
+
+function aggiornaScheda(taskId, nome, stato, dialogoInSospeso) {
+  const s = creaScheda(taskId, nome);
+  s.className = `scheda-conv ${coloreScheda(stato, dialogoInSospeso)}${convAttiva === taskId ? " attiva" : ""}`;
+  const x = s.querySelector(".chiudi");
+  // la × scarta solo conversazioni finite/errore; il conduttore mai (fissa)
+  if (taskId === "conduttore") { x.style.display = "none"; return; }
+  x.style.visibility = (stato === "finito" || stato === "errore") ? "visible" : "hidden";
+}
+
+function rimuoviScheda(taskId) {
+  if (taskId === "conduttore") {
+    // scheda fissa: mai rimossa; al massimo ripulita dal log e ricreata dal server
+    aggiornaScheda("conduttore", "superPi", "in_attesa", false);
+    return;
+  }
+  const s = document.getElementById(`scheda-${taskId}`);
+  if (s) s.remove();
+  if (convAttiva === taskId) { chiudiStream(taskId); convAttiva = null; mostraVista("home"); }
+  const log = logPerConv.get(taskId);
+  if (log) { log.remove(); logPerConv.delete(taskId); }
+  risposteMostrate.delete(taskId);
+  dialoghiMostrati.delete(taskId);
+}
+
+// --- canale globale: colora le schede senza guardarle ---
+function apriGlobale() {
+  if (esGlobale) esGlobale.close();
+  esGlobale = new EventSource("/eventi-globali");
+  esGlobale.addEventListener("stato", (e) => {
+    const d = JSON.parse(e.data);
+    if (d.stato === "rimosso") { rimuoviScheda(d.taskId); return; }
+    aggiornaScheda(d.taskId, d.nome, d.stato, d.dialogoInSospeso);
+  });
+}
+
+// --- stream completo di una conversazione (solo quella guardata) ---
+function apriStream(taskId) {
+  if (esPerConv.has(taskId)) return;
+  const es = new EventSource(`/eventi/${taskId}`);
+  esPerConv.set(taskId, es);
+  // Fix scheda vuota (2026-08-16): il div .log-conv va CREATO qui, prima di
+  // registrare i listener — prima si usava logPerConv.get() che per una
+  // conversazione aperta per la prima volta è undefined (logDi è get-or-create).
+  const log = logDi(taskId);
+  es.addEventListener("stato", (e) => {
+    const d = JSON.parse(e.data);
+    // snapshot all'apertura + cambi di stato
+    if (d.stato === "finito") {
+      rigaLog(log, "stato: finito — usa la × sulla scheda per chiudere la conversazione", "grezzo");
+      chiudiStream(taskId); // il server chiude: niente riconnessioni inutili
+    } else if (d.stato === "errore") {
+      rigaLog(log, "stato: errore — usa la × sulla scheda per chiudere la conversazione", "errore");
+      chiudiStream(taskId);
+    } else if (d.stato === "in_attesa") {
+      rigaLog(log, "stato: in attesa del prossimo messaggio", "grezzo");
+      if (convAttiva === taskId) mostraChat(true);
+    } else if (d.stato === "in_corso" && convAttiva === taskId) {
+      rigaLog(log, "stato: in corso...", "grezzo");
+    }
+  });
+  es.addEventListener("grezzo", (e) => {
+    const d = JSON.parse(e.data);
+    rigaLog(log, d.riga, "grezzo");
+  });
+  es.addEventListener("risposta", (e) => {
+    const d = JSON.parse(e.data);
+    // niente doppioni alla riapertura: stesso ts di una risposta già mostrata
+    if (d.ts && risposteMostrate.get(taskId)?.has(d.ts)) return;
+    const box = document.createElement("div");
+    box.className = "risposta";
+    const quando = document.createElement("span");
+    quando.className = "quando";
+    quando.textContent = d.ts ? new Date(d.ts).toLocaleTimeString() : "";
+    const testo = document.createElement("div");
+    testo.textContent = d.testo ?? "";
+    box.append(quando, testo);
+    log.appendChild(box);
+    log.scrollTop = log.scrollHeight;
+    if (d.ts) {
+      let s = risposteMostrate.get(taskId);
+      if (!s) { s = new Set(); risposteMostrate.set(taskId, s); }
+      s.add(d.ts);
+    }
+  });
+  es.addEventListener("dialogo", (e) => {
+    const d = JSON.parse(e.data);
+    // niente doppioni alla riapertura: stesso id di un dialogo già mostrato
+    if (dialoghiMostrati.get(taskId)?.has(d.id)) return;
+    rigaLog(log, `[${d.method}] ${d.title ?? ""} — richiesto ${d.ts}`, "grezzo");
+    mostraDialogo(log, taskId, d);
+    let s = dialoghiMostrati.get(taskId);
+    if (!s) { s = new Set(); dialoghiMostrati.set(taskId, s); }
+    s.add(d.id);
+  });
+  es.addEventListener("condensato", (e) => {
+    mostraCondensato(log, JSON.parse(e.data));
+  });
+  es.addEventListener("errore", (e) => {
+    const d = JSON.parse(e.data);
+    rigaLog(log, `ERRORE: ${d.motivo}`, "errore");
+  });
+}
+
+function chiudiStream(taskId) {
+  const es = esPerConv.get(taskId);
+  if (es) { es.close(); esPerConv.delete(taskId); }
+}
+
+function logDi(taskId) {
+  let log = logPerConv.get(taskId);
+  if (!log) {
+    log = document.createElement("div");
+    log.className = "log-conv";
+    document.getElementById("log-conv").appendChild(log);
+    logPerConv.set(taskId, log);
+  }
+  return log;
+}
+
+function rigaLog(log, testo, cls) {
+  const d = document.createElement("div");
+  d.className = cls ?? "";
+  d.textContent = testo;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+function mostraVista(vista) {
+  for (const v of ["home", "sessioni", "chat"]) {
+    document.getElementById(`vista-${v}`).hidden = v !== vista;
+  }
+  for (const b of document.querySelectorAll("#nav button[data-vista], #nav .scheda-conv")) {
+    b.classList.toggle("attiva", b.dataset.vista === vista || (vista === "chat" && b.classList.contains("scheda-conv") && b.id === `scheda-${convAttiva}`));
+  }
+  if (vista === "chat" && convAttiva) {
+    document.getElementById("chat-head").innerHTML = "";
+    const t = document.createElement("span");
+    t.className = "nome";
+    t.textContent = convAttiva;
+    document.getElementById("chat-head").appendChild(t);
+  }
+}
+
+function apriConversazione(taskId) {
+  if (convAttiva === taskId) { mostraVista("chat"); return; }
+  // chiudi lo stream della conversazione che si stava guardando
+  if (convAttiva) chiudiStream(convAttiva);
+  convAttiva = taskId;
+  apriStream(taskId);
+  for (const [id, log] of logPerConv) log.classList.toggle("attiva", id === taskId);
+  mostraVista("chat");
+  aggiornaScheda(taskId, document.getElementById(`scheda-${taskId}`)?.querySelector(".nome")?.textContent ?? "", "in_corso", false);
+}
+
+// navigazione Home/Sessioni: chiude lo stream della conversazione guardata
+document.querySelectorAll("#nav button[data-vista]").forEach((b) => {
+  b.addEventListener("click", () => {
+    if (convAttiva) chiudiStream(convAttiva);
+    convAttiva = null;
+    for (const s of document.querySelectorAll(".scheda-conv")) s.classList.toggle("attiva", false);
+    mostraVista(b.dataset.vista);
+  });
+});
+
+form.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const errEl = document.getElementById("errore-form");
+  errEl.textContent = "";
+  const obiettivo = document.getElementById("obiettivo").value.trim();
+  const cwd = document.getElementById("cwd").value.trim();
+  if (!obiettivo) { errEl.textContent = "l'obiettivo è obbligatorio"; return; }
+  // cwd: vuota o "lavori-superpi" = default lato server (sottocartella automatica).
+  // L'obiettivo resta obbligatorio; la cwd no: il server sa cosa fare.
+  let body;
+  try {
+    const r = await fetch("/task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": TOKEN },
+      body: JSON.stringify({ obiettivo, cwd }),
+    });
+    body = await r.json().catch(() => ({}));
+    if (!r.ok) { errEl.textContent = body.errore ?? `HTTP ${r.status}`; return; }
+  } catch (e) {
+    errEl.textContent = `richiesta fallita: ${e.message}`;
+    return;
+  }
+  document.getElementById("obiettivo").value = "";
+  creaScheda(body.id, obiettivo.slice(0, 48));
+  apriConversazione(body.id);
+});
+
+// --- chat della conversazione attiva ---
+function mostraChat(visibile) {
+  document.getElementById("chat").style.display = visibile ? "block" : "none";
+}
+
+document.getElementById("btn-invia").addEventListener("click", async () => {
+  const campo = document.getElementById("msg-chat");
+  const testo = campo.value.trim();
+  const errEl = document.getElementById("errore-chat");
+  errEl.textContent = "";
+  if (!testo) { errEl.textContent = "messaggio vuoto"; return; }
+  if (!convAttiva) { errEl.textContent = "nessuna conversazione aperta"; return; }
+  let j;
+  try {
+    const r = await fetch("/messaggio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": TOKEN },
+      body: JSON.stringify({ taskId: convAttiva, testo }),
+    });
+    j = await r.json().catch(() => ({}));
+    if (!r.ok) { errEl.textContent = j.errore ?? `HTTP ${r.status}`; return; }
+  } catch (e) {
+    errEl.textContent = `richiesta fallita: ${e.message}`;
+    return;
+  }
+  campo.value = "";
+  // Il messaggio dell'utente: stile proprio (.utente, bordo azzurro), distinto
+  // dal grezzo tecnico e dalla risposta del figlio (verde). Con orario, come
+  // la risposta, per leggere chi ha detto cosa.
+  const boxU = document.createElement("div");
+  boxU.className = "utente";
+  const quandoU = document.createElement("span");
+  quandoU.className = "quando";
+  quandoU.textContent = new Date().toLocaleTimeString();
+  const testoU = document.createElement("div");
+  testoU.textContent = `${testo}${j.accodato ? " (in coda: il figlio sta ancora lavorando)" : ""}`;
+  boxU.append(quandoU, testoU);
+  logDi(convAttiva).appendChild(boxU);
+});
+
+document.getElementById("btn-termina").addEventListener("click", async () => {
+  const errEl = document.getElementById("errore-chat");
+  errEl.textContent = "";
+  if (!convAttiva) { errEl.textContent = "nessuna conversazione aperta"; return; }
+  try {
+    const r = await fetch("/termina", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": TOKEN },
+      body: JSON.stringify({ taskId: convAttiva }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { errEl.textContent = j.errore ?? `HTTP ${r.status}`; return; }
+  } catch (e) {
+    errEl.textContent = `richiesta fallita: ${e.message}`;
+  }
+  rigaLog(logDi(convAttiva), "termina richiesto: il condensato arriverà a breve", "grezzo");
+});
+
+async function scartaConversazione(taskId) {
+  try {
+    const r = await fetch("/scarta", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": TOKEN },
+      body: JSON.stringify({ taskId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { rigaLog(logDi(convAttiva ?? taskId), `scarta: ${j.errore ?? `HTTP ${r.status}`}`, "errore"); return; }
+  } catch (e) {
+    rigaLog(logDi(convAttiva ?? taskId), `scarta: richiesta fallita: ${e.message}`, "errore");
+  }
+  // la scheda sparisce via /eventi-globali (stato rimosso); pulizia locale
+  rimuoviScheda(taskId);
+}
+
+function etaLeggibile(ms) {
+  if (ms == null) return "?";
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s fa`;
+  if (s < 3600) return `${Math.round(s / 60)}m fa`;
+  return `${Math.round(s / 3600)}h fa`;
+}
+
+async function aggiornaSessioni() {
+  const errEl = document.getElementById("errore-sessioni");
+  errEl.textContent = "";
+  let lista;
+  try {
+    const r = await fetch("/sessioni", { headers: { "X-CSRF-Token": TOKEN } });
+    lista = await r.json().catch(() => ({}));
+    if (!r.ok) { errEl.textContent = lista.errore ?? `HTTP ${r.status}`; return; }
+  } catch (e) {
+    errEl.textContent = `richiesta fallita: ${e.message}`;
+    return;
+  }
+  const el = document.getElementById("elenco-sessioni");
+  el.textContent = "";
+  document.getElementById("nota-sessioni").textContent =
+    `Lettura ${new Date(lista.lettaIl).toLocaleTimeString()} — aggiornamento manuale, nessun polling automatico.`;
+  for (const v of lista.finestre ?? []) {
+    const box = document.createElement("div");
+    box.className = "voce-sessione";
+    const testa = document.createElement("div");
+    testa.className = "testa";
+    testa.textContent = `[${v.cmd}] ${v.nome} — pid ${v.pid ?? "?"} — avviata ${etaLeggibile(v.etaMs)} — letta ${etaLeggibile(v.etaLetturaMs)}`;
+    box.appendChild(testa);
+    const dettaglio = document.createElement("div");
+    dettaglio.className = "testa";
+    dettaglio.textContent = `cwd: ${v.cwd ?? "?"}${v.sessioneId ? ` — sessione: ${v.sessioneId}` : ""}`;
+    box.appendChild(dettaglio);
+    if (v.snippet) {
+      const sn = document.createElement("div");
+      sn.className = "snippet";
+      sn.textContent = v.snippet;
+      box.appendChild(sn);
+    }
+    if (v.cmd === "pi") {
+      if (v.sessioneId) {
+        const b = document.createElement("button");
+        b.textContent = "Prendi il controllo";
+        b.onclick = () => prendiControllo(v.nome, b);
+        box.appendChild(b);
+      } else {
+        const m = document.createElement("div");
+        m.className = "motivo";
+        m.textContent = `non riprendibile: ${v.motivoNoId ?? "motivo sconosciuto"}`;
+        box.appendChild(m);
+      }
+    } else {
+      const m = document.createElement("div");
+      m.className = "motivo";
+      m.textContent = "sessione Claude: visibile, non riprendibile da superPi.";
+      box.appendChild(m);
+    }
+    el.appendChild(box);
+  }
+  for (const c of lista.claude ?? []) {
+    const box = document.createElement("div");
+    box.className = "voce-sessione";
+    const testa = document.createElement("div");
+    testa.className = "testa";
+    testa.textContent = `[claude] ${c.name ?? c.sessionId ?? "?"} — stato ${c.status ?? "?"} — avviata ${etaLeggibile(c.etaMs)} — letta ${etaLeggibile(lista.etaLetturaMs)}`;
+    box.appendChild(testa);
+    const dettaglio = document.createElement("div");
+    dettaglio.className = "testa";
+    dettaglio.textContent = `cwd: ${c.cwd ?? "?"} — pid ${c.pid ?? "?"}`;
+    box.appendChild(dettaglio);
+    const m = document.createElement("div");
+    m.className = "motivo";
+    m.textContent = "sessione Claude: visibile, non riprendibile da superPi.";
+    box.appendChild(m);
+    el.appendChild(box);
+  }
+  if (!(lista.finestre ?? []).length && !(lista.claude ?? []).length) {
+    el.textContent = "nessuna sessione pi/claude trovata.";
+  }
+}
+
+document.getElementById("btn-aggiorna-sessioni").addEventListener("click", aggiornaSessioni);
+
+async function prendiControllo(nome, btn) {
+  const msg = document.getElementById("msg-ripresa").value.trim();
+  const body = { finestra: nome };
+  if (msg) body.obiettivo = msg;
+  btn.disabled = true;
+  btn.textContent = "prendendo il controllo...";
+  let j;
+  try {
+    const r = await fetch("/riprendi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": TOKEN },
+      body: JSON.stringify(body),
+    });
+    j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      rigaLog(logDi("x"), `riprendi ${nome}: ${j.errore ?? `HTTP ${r.status}`}`, "errore");
+      btn.disabled = false;
+      btn.textContent = "Prendi il controllo";
+      return;
+    }
+  } catch (e) {
+    rigaLog(logDi("x"), `riprendi ${nome}: richiesta fallita: ${e.message}`, "errore");
+    btn.disabled = false;
+    btn.textContent = "Prendi il controllo";
+    return;
+  }
+  rigaLog(logDi("x"), `controllo preso su ${nome} — sessione ${j.sessioneRipresa} (task ${j.id})`, "grezzo");
+  creaScheda(j.id, nome);
+  apriConversazione(j.id);
+}
+
+function mostraDialogo(log, taskId, d) {
+  const box = document.createElement("div");
+  box.className = "dialogo";
+  const titolo = document.createElement("div");
+  titolo.className = "titolo";
+  titolo.textContent = `[${d.method}] ${d.title ?? ""} — richiesto ${d.ts}`;
+  box.appendChild(titolo);
+  if (d.message) {
+    const msg = document.createElement("div");
+    msg.className = "msg";
+    msg.textContent = d.message;
+    box.appendChild(msg);
+  }
+  const rispondi = async (payload) => {
+    try {
+      await fetch("/rispondi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": TOKEN },
+        body: JSON.stringify({ taskId, id: d.id, ...payload }),
+      });
+    } catch { /* la pagina mostra comunque l'esito ottimista; un eventuale errore compare nel log */ }
+    const esito = document.createElement("div");
+    esito.className = "esito";
+    esito.textContent = `risposta inviata: ${JSON.stringify(payload)}`;
+    box.appendChild(esito);
+    box.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+  };
+  if (d.method === "confirm") {
+    const sì = document.createElement("button");
+    sì.textContent = "Conferma";
+    sì.onclick = () => rispondi({ confirmed: true });
+    const no = document.createElement("button");
+    no.className = "rifiuta";
+    no.textContent = "Rifiuta";
+    no.onclick = () => rispondi({ confirmed: false });
+    box.append(sì, no);
+  } else if (d.method === "select" && Array.isArray(d.options)) {
+    for (const op of d.options) {
+      const b = document.createElement("button");
+      b.textContent = op;
+      b.onclick = () => rispondi({ value: op });
+      box.appendChild(b);
+    }
+  }
+  log.appendChild(box);
+  log.scrollTop = log.scrollHeight;
+}
+
+function mostraCondensato(log, c) {
+  const box = document.createElement("div");
+  box.className = "condensato";
+  const titolo = document.createElement("div");
+  titolo.className = "titolo";
+  titolo.textContent = "— condensato —";
+  box.appendChild(titolo);
+  const ob = document.createElement("div");
+  ob.textContent = `obiettivo: ${c.obiettivo}`;
+  box.appendChild(ob);
+  const f = document.createElement("div");
+  f.textContent = `fatto (${(c.fatto ?? []).length}): ${(c.fatto ?? []).map((x) => `${x.toolName} @ ${x.ts}`).join(" · ") || "—"}`;
+  box.appendChild(f);
+  const ic = document.createElement("div");
+  ic.textContent = `in_corso: ${c.in_corso ? `${c.in_corso.toolName} @ ${c.in_corso.ts}` : "null"}`;
+  box.appendChild(ic);
+  const bl = document.createElement("div");
+  bl.className = c.bloccato_su ? "bloccato" : "";
+  bl.textContent = `bloccato_su: ${c.bloccato_su ?? "null"}`;
+  box.appendChild(bl);
+  const eta = document.createElement("div");
+  eta.textContent = `eta_ultimo_evento: ${c.eta_ultimo_evento}`;
+  box.appendChild(eta);
+  log.appendChild(box);
+  log.scrollTop = log.scrollHeight;
+}
+
+// --- avvio ---
+apriGlobale();
+// scheda FISSA del conduttore (superPi): sempre presente, non scartabile;
+// il server la crea al primo messaggio — gli eventi globali la colorano.
+creaScheda("conduttore", "superPi");
+aggiornaScheda("conduttore", "superPi", "in_attesa", false);
+// conversazioni già esistenti (avviate da un'altra pagina o prima del reload):
+// le schede compaiono dallo snapshot di /eventi-globali.
+</script>
+</body>
+</html>
