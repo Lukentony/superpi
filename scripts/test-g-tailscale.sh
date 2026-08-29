@@ -1,46 +1,90 @@
 #!/usr/bin/env bash
 # Test G — raggiungibilità via Tailscale serve (verifica superPi Fase 9).
 #
-# Richiede il permesso operatore concesso in anticipo
-# (`sudo tailscale set --operator=<tuo-utente>`), altrimenti `tailscale serve`
-# chiede sudo ad ogni chiamata. Esegue l'intera sequenza con un comando solo:
-#   bash scripts/test-g-tailscale.sh
-#
-# Cosa fa: avvia un server HTTP di prova su 127.0.0.1:8437, lo espone con
-# `tailscale serve --bg --http 8437 8437` (su alcuni tailnet HTTPS/443 non è
-# disponibile senza una configurazione dedicata — verificalo dal vivo, non
-# darlo per scontato), verifica la config con `tailscale serve status` e prova
-# la raggiungibilità in tre modi separati — indirizzo numerico del tailnet,
-# nome breve (hostname della macchina), nome MagicDNS esteso (quello che
-# `serve status` di solito consiglia) — ripetendo l'indirizzo numerico 3 volte
-# a distanza di secondi (un run reale ha mostrato un fallimento intermittente
-# solo lì: ipotesi di self-access da confermare, non da assumere). Poi fa
-# reset della config e spegne il server (trap). L'ultimo output dice l'esito
-# di CIASCUN indirizzo.
+# Esegue la sequenza in una configurazione Tailscale temporaneamente sostituita
+# e ripristinata esattamente al termine. Il test è opt-in e usa i nomi rilevati
+# da Tailscale oppure SUPERPI_TAILSCALE_HOST/SUPERPI_TAILSCALE_FQDN.
 set -euo pipefail
 
 PORTA=8437
-NOME_BREVE="$(hostname -s)"
-NOME_ESTESO="${TAILSCALE_HOSTNAME:?imposta TAILSCALE_HOSTNAME al nome MagicDNS esteso della tua macchina}"
-IP_TAILNET="$(tailscale ip -4 | head -1)"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+STATE_DIR="$ROOT/.test-run"
+SNAPSHOT_FILE=""
+SNAPSHOT_READY=0
+NOME_BREVE="${SUPERPI_TAILSCALE_HOST:-}"
+NOME_ESTESO="${SUPERPI_TAILSCALE_FQDN:-}"
 NODE_SERVER_PID=""
 OK_COUNT=0
 
+if ! command -v tailscale >/dev/null 2>&1; then
+  echo "=== Test G: SKIP (tailscale non installato) ==="
+  exit 0
+fi
+
+mkdir -p "$STATE_DIR"
+chmod 700 "$STATE_DIR"
+
+if ! tailscale serve status >/dev/null 2>&1 || \
+   ! tailscale serve get-config --help >/dev/null 2>&1 || \
+   ! tailscale serve set-config --help >/dev/null 2>&1; then
+  echo "=== Test G: SKIP (Tailscale Serve o snapshot/restore config non supportato) ==="
+  exit 0
+fi
+
+SNAPSHOT_FILE="$(mktemp "$STATE_DIR/superpi-tailscale-test-config.XXXXXX")"
+chmod 600 "$SNAPSHOT_FILE"
+if ! tailscale serve get-config --all >"$SNAPSHOT_FILE" 2>/dev/null; then
+  echo "=== Test G: SKIP (snapshot Tailscale Serve non supportato o non leggibile) ==="
+  rm -f "$SNAPSHOT_FILE"
+  SNAPSHOT_FILE=""
+  exit 0
+fi
+chmod 600 "$SNAPSHOT_FILE"
+SNAPSHOT_READY=1
+
 pulizia() {
-  # nessun residuo: serve config via, server di prova spento
-  tailscale serve reset >/dev/null 2>&1 || true
-  if [ -n "$NODE_SERVER_PID" ] && kill -0 "$NODE_SERVER_PID" 2>/dev/null; then
+  local status=$?
+  trap - EXIT INT TERM
+
+  if [[ -n "$NODE_SERVER_PID" ]] && kill -0 "$NODE_SERVER_PID" 2>/dev/null; then
     kill "$NODE_SERVER_PID" 2>/dev/null || true
   fi
+  if (( SNAPSHOT_READY )); then
+    local restore_ok=0
+    if node -e 'const c=require("fs").readFileSync(process.argv[1], "utf8"); const j=JSON.parse(c); process.exit(Object.keys(j).every(k => k === "version") ? 0 : 1)' "$SNAPSHOT_FILE" >/dev/null 2>&1; then
+      tailscale serve reset >/dev/null 2>&1 && restore_ok=1
+    else
+      tailscale serve set-config --all "$SNAPSHOT_FILE" >/dev/null 2>&1 && restore_ok=1
+    fi
+    if (( restore_ok )); then
+      SNAPSHOT_READY=0
+      rm -f "$SNAPSHOT_FILE"
+      SNAPSHOT_FILE=""
+    else
+      echo "Test G: impossibile ripristinare la configurazione Tailscale; snapshot conservato in $SNAPSHOT_FILE" >&2
+      status=1
+    fi
+  fi
+  exit "$status"
 }
-trap pulizia EXIT
+trap pulizia EXIT INT TERM
 
+IP_TAILNET="$(tailscale ip -4 2>/dev/null | head -1 || true)"
+if [ -z "$IP_TAILNET" ]; then
+  echo "=== Test G: SKIP (nessun IP Tailscale rilevato) ==="
+  exit 0
+fi
 echo "=== Test G: tailscale serve (senza sudo, operatore attivo) ==="
 echo "IP tailnet: $IP_TAILNET"
+if [ -z "$NOME_ESTESO" ]; then
+  NOME_ESTESO="$(tailscale status --json 2>/dev/null | node -e 'let s=""; process.stdin.on("data", d => s += d).on("end", () => { try { const n=JSON.parse(s).Self?.DNSName ?? ""; process.stdout.write(n.replace(/\.$/, "")); } catch {} })')"
+fi
+if [ -z "$NOME_BREVE" ] && [ -n "$NOME_ESTESO" ]; then
+  NOME_BREVE="${NOME_ESTESO%%.*}"
+fi
 
 # 1. il permesso operatore è efficace se serve config funziona SENZA sudo:
 #    se fallisse qui, è un risultato da riportare, non un ostacolo da aggirare
-tailscale serve status >/dev/null
 echo "serve status leggibile senza sudo: ok"
 
 # 2. server di prova locale (sola porta locale, nessuna interfaccia di rete)
@@ -54,9 +98,11 @@ fi
 echo "server locale ok: http://127.0.0.1:$PORTA"
 
 # 3. esposizione sul tailnet SENZA sudo (HTTP puro: HTTPS/443 non implementato)
-tailscale serve --bg --http "$PORTA" "$PORTA"
+if ! tailscale serve --bg --http "$PORTA" "$PORTA" >/dev/null 2>&1; then
+  echo "FALLITO: configurazione Tailscale Serve non riuscita"
+  exit 1
+fi
 echo "serve config applicata senza sudo: ok"
-tailscale serve status
 
 # 4. raggiungibilità, un tentativo per indirizzo, risultati separati
 prova() {
@@ -80,14 +126,14 @@ sleep 3
 prova "indirizzo numerico (tentativo 2)" "http://$IP_TAILNET:$PORTA/"
 sleep 3
 prova "indirizzo numerico (tentativo 3)" "http://$IP_TAILNET:$PORTA/"
-prova "nome breve" "http://$NOME_BREVE:$PORTA/"
-prova "nome esteso (consigliato da serve status)" "http://$NOME_ESTESO:$PORTA/"
+if [ -n "$NOME_BREVE" ]; then prova "nome breve" "http://$NOME_BREVE:$PORTA/"; fi
+if [ -n "$NOME_ESTESO" ]; then prova "nome esteso" "http://$NOME_ESTESO:$PORTA/"; fi
 
 echo ""
 if [ "$OK_COUNT" -gt 0 ]; then
-  echo "=== Test G: PASS (raggiungibile: $OK_COUNT/5; dettagli sopra; serve config rimossa e server spento dal trap) ==="
+  echo "=== Test G: PASS (raggiungibile: $OK_COUNT; dettagli sopra; configurazione ripristinata e server spento dal trap) ==="
   exit 0
 else
-  echo "=== Test G: FAIL (nessuno dei 3 indirizzi ha risposto; dettagli sopra) ==="
+  echo "=== Test G: FAIL (nessuno degli indirizzi ha risposto; dettagli sopra) ==="
   exit 1
 fi

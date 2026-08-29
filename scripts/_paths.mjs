@@ -8,3 +8,6 @@ export const TEST_RUN_DIR = join(ROOT, ".test-run");
 export const SESSION_DIR = join(TEST_RUN_DIR, "sessioni");
 export const NOTE_DIR = join(TEST_RUN_DIR, "note");
 export const CWD_DIR = join(TEST_RUN_DIR, "cwd");
+// Tutti i figli delle suite live usano Codex Luna: mai quota OpenCode Go.
+export const TEST_PROVIDER = "openai-codex";
+export const TEST_MODEL = "gpt-5.6-luna";

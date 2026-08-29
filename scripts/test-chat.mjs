@@ -235,7 +235,7 @@ try {
   fs.mkdirSync(SCRATCH, { recursive: true });
   execFileSync("tmux", ["new-session", "-d", "-s", "superpi-test-chat", "-n", "test-chat", "-c", SCRATCH]);
   const uuidR = crypto.randomUUID();
-  execFileSync("tmux", ["send-keys", "-t", "superpi-test-chat:test-chat", `pi --session-id ${uuidR}` , "Enter"]);
+  execFileSync("tmux", ["send-keys", "-t", "superpi-test-chat:test-chat", `pi --model openai-codex/gpt-5.6-luna --session-id ${uuidR}` , "Enter"]);
   await new Promise((r) => setTimeout(r, 30 * 1000));
   execFileSync("tmux", ["send-keys", "-t", "superpi-test-chat:test-chat", "Esegui il comando bash: echo prechat, poi rispondi esattamente PRECHAT_OK", "Enter"]);
   let fileSess = null;

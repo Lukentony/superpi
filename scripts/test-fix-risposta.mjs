@@ -181,7 +181,7 @@ try {
   console.log("[fix] punto 4 — sunto alla ripresa sullo stream");
   // pre-trust della cartella nuova (trust prompt interattivo, lezione già pagata)
   execFileSync("tmux", ["new-session", "-d", "-s", "superpi-trust-fix", "-n", "t", "-c", SCRATCH]);
-  execFileSync("tmux", ["send-keys", "-t", "superpi-trust-fix:t", `pi --session-id ${crypto.randomUUID()}`, "Enter"]);
+  execFileSync("tmux", ["send-keys", "-t", "superpi-trust-fix:t", `pi --model openai-codex/gpt-5.6-luna --session-id ${crypto.randomUUID()}`, "Enter"]);
   await sleep(25 * 1000);
   const pane = execFileSync("tmux", ["capture-pane", "-p", "-t", "superpi-trust-fix:t"], { encoding: "utf8" });
   if (pane.includes("Trust project folder")) {
@@ -191,7 +191,7 @@ try {
   execFileSync("tmux", ["kill-session", "-t", "superpi-trust-fix"], { stdio: "ignore" });
   execFileSync("tmux", ["new-session", "-d", "-s", "superpi-test-fix-risp", "-n", "wt", "-c", SCRATCH]);
   const uuid = crypto.randomUUID();
-  execFileSync("tmux", ["send-keys", "-t", "superpi-test-fix-risp:wt", `pi --session-id ${uuid}`, "Enter"]);
+  execFileSync("tmux", ["send-keys", "-t", "superpi-test-fix-risp:wt", `pi --model openai-codex/gpt-5.6-luna --session-id ${uuid}`, "Enter"]);
   await sleep(30 * 1000);
   execFileSync("tmux", ["send-keys", "-t", "superpi-test-fix-risp:wt", "Il codice è SUNTO_RIP, ricordalo.", "Enter"]);
   const dirSan = "--tmp-superpi-verifica-fix-risposta-2026-08-16--";

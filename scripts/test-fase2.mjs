@@ -7,7 +7,7 @@ import fs from "node:fs";
 import { join } from "node:path";
 import { creaFiglio, avviaFiglio, promptFiglio, conTimeout, fermaFiglio } from "../src/spawner.mjs";
 import { creaScriba } from "../src/scriba.mjs";
-import { SESSION_DIR, CWD_DIR, NOTE_DIR } from "./_paths.mjs";
+import { SESSION_DIR, CWD_DIR, NOTE_DIR, TEST_PROVIDER, TEST_MODEL } from "./_paths.mjs";
 
 fs.mkdirSync(CWD_DIR, { recursive: true });
 
@@ -19,6 +19,8 @@ const figlio = creaFiglio({
   nome: "fase2-scriba-01",
   sessionId,
   sessionDir: SESSION_DIR,
+  provider: TEST_PROVIDER,
+  model: TEST_MODEL,
   timeoutMs: 120000,
 });
 

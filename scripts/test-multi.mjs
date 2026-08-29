@@ -53,7 +53,7 @@ function sleep(ms) {
 
 const proc = spawn("node", [join(ROOT, "src", "server.mjs")], {
   cwd: ROOT,
-  env: { ...process.env, SUPERPI_PORT: String(PORT), SUPERPI_MAX_CONVERSAZIONI: String(MAX_CONV), SUPERPI_GATE_QUOTA_FAKE: "1" },
+  env: { ...process.env, SUPERPI_PORT: String(PORT), SUPERPI_MAX_CONVERSAZIONI: String(MAX_CONV), SUPERPI_PROTECTED_ROOT: HIVE_ROOT, SUPERPI_GATE_QUOTA_FAKE: "1" },
   stdio: ["ignore", "pipe", "pipe"],
 });
 let logServer = "";
@@ -243,7 +243,7 @@ try {
   execFileSync("tmux", ["new-window", "-t", PRE, "-n", "t2", "-c", CWD_B]);
   execFileSync("tmux", ["new-window", "-t", PRE, "-n", "t3", "-c", CWD_FAIL]);
   for (const n of [1, 2, 3]) {
-    execFileSync("tmux", ["send-keys", "-t", `${PRE}:t${n}`, `pi --session-id ${crypto.randomUUID()}`, "Enter"]);
+    execFileSync("tmux", ["send-keys", "-t", `${PRE}:t${n}`, `pi --model openai-codex/gpt-5.6-luna --session-id ${crypto.randomUUID()}`, "Enter"]);
   }
   await sleep(25 * 1000);
   for (const n of [1, 2, 3]) {
@@ -259,7 +259,7 @@ try {
   execFileSync("git", ["-C", HIVE_ROOT, "worktree", "add", "-b", WT_BRANCH, WT_GATE, "main"]);
   execFileSync("tmux", ["new-session", "-d", "-s", "superpi-test-gate", "-n", "wt", "-c", WT_GATE]);
   const uuidWt = crypto.randomUUID();
-  execFileSync("tmux", ["send-keys", "-t", "superpi-test-gate:wt", `pi --session-id ${uuidWt}`, "Enter"]);
+  execFileSync("tmux", ["send-keys", "-t", "superpi-test-gate:wt", `pi --model openai-codex/gpt-5.6-luna --session-id ${uuidWt}`, "Enter"]);
   await sleep(30 * 1000);
   await superaTrust("superpi-test-gate:wt");
   execFileSync("tmux", ["send-keys", "-t", "superpi-test-gate:wt", "Il codice è GATE_OK, ricordalo.", "Enter"]);

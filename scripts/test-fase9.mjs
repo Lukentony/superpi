@@ -37,7 +37,7 @@ function check(nome, cond, dettaglio = "") {
 console.log("[fase9] avvio server di test su porta " + PORT);
 const proc = spawn("node", [join(ROOT, "src", "server.mjs")], {
   cwd: ROOT,
-  env: { ...process.env, SUPERPI_PORT: String(PORT) },
+  env: { ...process.env, SUPERPI_PORT: String(PORT), SUPERPI_PROTECTED_ROOT: join(os.homedir(), "hive") },
   stdio: ["ignore", "pipe", "pipe"],
 });
 let logServer = "";

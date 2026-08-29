@@ -1,11 +1,11 @@
-// Passo 0 — verifica dal vivo di RpcClient (guida hive/appunti/superpi-guida-2026-08-10.md §4.1).
+// Live smoke for Pi's RpcClient event ordering.
 // Figlio: mai in $HOME, mai in hive. CWD e session-dir in .test-run/.
 import { RpcClient } from "@earendil-works/pi-coding-agent";
 import crypto from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { SESSION_DIR, CWD_DIR } from "./_paths.mjs";
+import { SESSION_DIR, CWD_DIR, TEST_PROVIDER, TEST_MODEL } from "./_paths.mjs";
 
 mkdirSync(CWD_DIR, { recursive: true });
 mkdirSync(SESSION_DIR, { recursive: true });
@@ -18,8 +18,8 @@ const CLI_PATH = join(dirname(INDEX_PATH), "cli.js");
 const client = new RpcClient({
   cliPath: CLI_PATH,
   cwd: CWD_DIR,
-  provider: "opencode-go",
-  model: "deepseek-v4-flash",
+  provider: TEST_PROVIDER,
+  model: TEST_MODEL,
   args: ["--session-id", crypto.randomUUID(), "-n", "verifica-rpcclient", "--session-dir", SESSION_DIR],
 });
 

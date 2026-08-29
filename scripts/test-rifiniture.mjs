@@ -253,7 +253,7 @@ async function attendiBootPronto(target, timeoutMs, desc) {
     }
     const righe = pane.split("\n").map((l) => l.trim()).filter(Boolean);
     const ult = righe[righe.length - 1] ?? "";
-    if (ult.includes("deepseek") || ult.includes("→") || /^>/.test(ult)) {
+    if (ult.includes("gpt-5.6-luna") || ult.includes("→") || /^>/.test(ult)) {
       // la status bar appare PRIMA che il prompt di input sia attivo: un input
       // mandato subito si perde (verificato 2026-08-17). Margine di sicurezza.
       await sleep(8000);
@@ -301,7 +301,7 @@ try {
   execFileSync("tmux", ["new-window", "-t", SESS, "-n", "t4", "-c", join(SCRATCH_BASE, "t4")]);
   const u = { 1: crypto.randomUUID(), 2: crypto.randomUUID(), 3: crypto.randomUUID(), 4: crypto.randomUUID() };
   for (const n of [1, 2, 3, 4]) {
-    execFileSync("tmux", ["send-keys", "-t", `${SESS}:t${n}`, `pi --session-id ${u[n]}`, "Enter"]);
+    execFileSync("tmux", ["send-keys", "-t", `${SESS}:t${n}`, `pi --model openai-codex/gpt-5.6-luna --session-id ${u[n]}`, "Enter"]);
   }
   // boot: NON uno sleep fisso — il send-keys dello scambio può perdersi se la
   // finestra non è pronta (verificato 2026-08-17: boot parallelo oltre 30s

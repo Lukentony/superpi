@@ -1,4 +1,4 @@
-// Fix scheda nuova vuota (2026-08-16): bug trovato da Luca provando la pagina
+// Regression test for an empty new conversation tab.
 // — scritto un obiettivo in Home, la scheda nuova appariva ma vuota. Causa
 // (verificata con DOM-finto, non solo lettura): apriStream() usava
 // logPerConv.get() ma non creava mai il div .log-conv; logDi() è get-or-create.

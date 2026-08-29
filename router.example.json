@@ -1,0 +1,25 @@
+{
+  "versione": 1,
+  "modelloRouter": {
+    "provider": "openai-codex",
+    "model": "gpt-5.6-luna"
+  },
+  "profili": {
+    "scout": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-luna"
+    },
+    "microfix": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-luna"
+    },
+    "standard": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-luna"
+    },
+    "long": {
+      "provider": "openai-codex",
+      "model": "gpt-5.6-luna"
+    }
+  }
+}

@@ -9,7 +9,7 @@
 //   1. cwd sicura: realpath della cwd (i path relativi e con ".." risolvono
 //      correttamente) mai uguale a $HOME esatta, mai dentro la radice di hive.
 //      permettiHive = true salta SOLO i controlli su hive (per /riprendi:
-//      la sessione esisteva già, aperta da Luca — deciso 2026-08-13); il
+//      la sessione esisteva già e l'operatore l'ha aperta in precedenza; il
 //      controllo $HOME esatta resta SEMPRE attivo, in ogni caso, senza eccezioni.
 //   2. quota: OpenCode Go rolling 5h non oltre la soglia (default 80%).
 //      Quota non determinabile → rifiuto esplicito (fail-closed), mai un
@@ -48,7 +48,7 @@ export function verificaCwd(cwd, { homeDir = homedir(), hiveRoot = join(homedir(
   // La radice di hive e tutto il suo albero: se hiveRoot non esiste sulla
   // macchina non c'è nulla da proteggere, il controllo salta. Con
   // permettiHive: true il controllo hive è saltato (solo per /riprendi —
-  // deciso con Luca 2026-08-13; /task non usa mai permettiHive).
+  // deciso per il percorso di ripresa; /task non usa mai permettiHive).
   if (!permettiHive) {
     try {
       const hiveReale = realpathSync(hiveRoot);

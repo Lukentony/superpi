@@ -19,7 +19,7 @@ import fs from "node:fs";
 import { join } from "node:path";
 import { creaFiglio, avviaFiglio, promptFiglio, fermaFiglio, conTimeout } from "../src/spawner.mjs";
 import { creaScriba } from "../src/scriba.mjs";
-import { SESSION_DIR, NOTE_DIR, TEST_RUN_DIR } from "./_paths.mjs";
+import { SESSION_DIR, NOTE_DIR, TEST_RUN_DIR, TEST_PROVIDER, TEST_MODEL } from "./_paths.mjs";
 
 const EST_DIR = join(TEST_RUN_DIR, "estensione-test");
 const EST_FILE = join(EST_DIR, ".pi", "extensions", "test-conferma.ts");
@@ -122,6 +122,8 @@ function figlioDiProva(nome) {
     nome,
     sessionId: crypto.randomUUID(),
     sessionDir: SESSION_DIR,
+    provider: TEST_PROVIDER,
+    model: TEST_MODEL,
     timeoutMs: 180000,
     // --approve: .test-run/ non ha decisioni di trust salvate e le modalità
     // non interattive senza trust "ask" NON caricano le estensioni di progetto

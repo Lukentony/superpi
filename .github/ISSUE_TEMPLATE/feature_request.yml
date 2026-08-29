@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest a focused improvement to superPi
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What user problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest useful change and any compatibility impact.
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Project constraints
+      options:
+        - label: I have checked the roadmap and existing documentation.
+          required: true
+        - label: This proposal does not require credentials or live services in npm test.
+          required: true

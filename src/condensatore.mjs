@@ -1,4 +1,4 @@
-// Fase 6 — condensatore (guida hive/appunti/superpi-guida-2026-08-10.md §4.5).
+// Deterministic condenser: derives a compact state from the append-only tool log.
 //
 // Legge il file grezzo dello scriba e produce:
 //   {obiettivo, fatto, in_corso, bloccato_su, eta_ultimo_evento}

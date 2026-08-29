@@ -1,5 +1,5 @@
-// Tre bug di chat in pagina.html (2026-08-18), trovati da Luca con "prendi il
-// controllo" per davvero:
+// Three chat regressions in pagina.html: user styling, ordering, and deduplication.
+// found during manual resume testing:
 //  1. il messaggio dell'utente non aveva colore (usava .grezzo, confuso col
 //     rumore tecnico) -> classe .utente propria (bordo azzurro, terzo stile)
 //  2. l'ultima risposta si ripeteva a ogni riapertura della scheda (lo snapshot

@@ -3,13 +3,19 @@
 // resta il provider primario — questo modulo entra in gioco solo quando il
 // primario dice di no.
 //
-// Bridging del nome della credenziale (verificato dal vivo il 2026-08-18):
-// il secret nel vault si chiama "openrouter" e il comando `secret env openrouter`
-// produce `export OPENROUTER_API_TOKEN=<valore>`; pi e OpenRouter riconoscono le
-// credenziali SOLO come OPENROUTER_API_KEY. Il valore transita SOLO in memoria
-// (subprocesso del comando `secret env`, mai la variante che riverserebbe il
-// valore su stdout o su disco) e non deve MAI comparire in log, broadcast,
-// risposte HTTP, commit o report.
+// Portabilità della credenziale (audit hive 2026-08-20, punto 4): prima
+// sorgente valida è l'env standard OPENROUTER_API_KEY — nessuno strumento
+// esterno richiesto solo per l'installazione del maintainer; un helper `secret env
+// openrouter` resta SOLO come fallback retrocompatibile quando quell'env
+// manca (un vault esterno non incluso in questo repository).
+//
+// Bridging del nome della credenziale nel fallback (verificato dal vivo il
+// 2026-08-18): il secret nel vault si chiama "openrouter" e il comando
+// `secret env openrouter` produce `export OPENROUTER_API_TOKEN=<valore>`; pi
+// e OpenRouter riconoscono le credenziali SOLO come OPENROUTER_API_KEY. Il
+// valore transita SOLO in memoria (subprocesso dell'helper `secret env`, mai
+// la variante che riverserebbe il valore su stdout o su disco) e non deve MAI
+// comparire in log, broadcast, risposte HTTP, commit o report.
 //
 // Segnale di saldo (verificato dal vivo e nella documentazione ufficiale):
 // GET https://openrouter.ai/api/v1/credits ("Get remaining credits") ritorna
@@ -23,9 +29,13 @@ const SOGLIA_SALDO_MINIMO = 0.5; // in crediti; sotto questa la riserva è esaur
 export const OPENROUTER_VARIABILE = "OPENROUTER_API_KEY";
 export const OPENROUTER_MODELLO = "deepseek/deepseek-v4-flash";
 
-// Legge il valore dal vault in memoria. Ritorna { valore } — il NOME da usare
-// è OPENROUTER_VARIABILE (bridging), mai quello del vault.
+// Legge la credenziale OpenRouter. Prima sorgente: process.env.OPENROUTER_API_KEY
+// (portabile). Solo se manca, fallback sull'helper esterno via `secret env
+// openrouter`. Ritorna { valore } in entrambi i casi — il NOME da usare è
+// sempre OPENROUTER_VARIABILE (bridging), mai quello del vault.
 export function leggiCredenzialeOpenRouter({ esegui = execFileSync } = {}) {
+  const daEnv = process.env[OPENROUTER_VARIABILE];
+  if (daEnv) return { valore: daEnv };
   const out = esegui("secret", ["env", "openrouter"], { encoding: "utf8", timeout: 10000 });
   const m = out.match(/^export\s+[A-Z0-9_]+\s*=\s*(.*)$/m);
   if (!m) throw new Error("secret openrouter non leggibile (formato inatteso)");

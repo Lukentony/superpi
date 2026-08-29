@@ -55,7 +55,7 @@
   .log-conv.attiva { display:block; }
   .grezzo { font-size:12px; word-break:break-all; white-space:pre-wrap; margin:2px 0; }
   /* La risposta a parole del figlio (fix 2026-08-16): non è una riga di log
-     tecnico come il grezzo — si legge come un messaggio. Verifica visiva di Luca. */
+     tecnico come il grezzo — si legge come un messaggio. Verifica manuale. */
   .risposta { white-space:pre-wrap; word-break:break-word; margin:8px 0; padding:6px 10px; background:#10161d; border-left:3px solid var(--verde); color:var(--fg); }
   .risposta .quando { color:var(--grigio); font-size:11px; display:block; margin-bottom:2px; }
   /* Il messaggio dell'utente (2026-08-18): terzo stile, distinto sia dal grezzo
@@ -422,6 +422,7 @@ document.getElementById("btn-termina").addEventListener("click", async () => {
     if (!r.ok) { errEl.textContent = j.errore ?? `HTTP ${r.status}`; return; }
   } catch (e) {
     errEl.textContent = `richiesta fallita: ${e.message}`;
+    return;
   }
   rigaLog(logDi(convAttiva), "termina richiesto: il condensato arriverà a breve", "grezzo");
 });
@@ -437,6 +438,7 @@ async function scartaConversazione(taskId) {
     if (!r.ok) { rigaLog(logDi(convAttiva ?? taskId), `scarta: ${j.errore ?? `HTTP ${r.status}`}`, "errore"); return; }
   } catch (e) {
     rigaLog(logDi(convAttiva ?? taskId), `scarta: richiesta fallita: ${e.message}`, "errore");
+    return;
   }
   // la scheda sparisce via /eventi-globali (stato rimosso); pulizia locale
   rimuoviScheda(taskId);
@@ -572,13 +574,29 @@ function mostraDialogo(log, taskId, d) {
     box.appendChild(msg);
   }
   const rispondi = async (payload) => {
+    let r;
+    let j;
     try {
-      await fetch("/rispondi", {
+      r = await fetch("/rispondi", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": TOKEN },
         body: JSON.stringify({ taskId, id: d.id, ...payload }),
       });
-    } catch { /* la pagina mostra comunque l'esito ottimista; un eventuale errore compare nel log */ }
+      j = await r.json().catch(() => ({}));
+    } catch (e) {
+      const esito = document.createElement("div");
+      esito.className = "esito errore";
+      esito.textContent = `risposta fallita: ${e.message}`;
+      box.appendChild(esito);
+      return;
+    }
+    if (!r.ok) {
+      const esito = document.createElement("div");
+      esito.className = "esito errore";
+      esito.textContent = j.errore ?? `HTTP ${r.status}`;
+      box.appendChild(esito);
+      return;
+    }
     const esito = document.createElement("div");
     esito.className = "esito";
     esito.textContent = `risposta inviata: ${JSON.stringify(payload)}`;

@@ -6,7 +6,7 @@
 //   3  cwd esplicita -> usata com'è, NESSUNA sottocartella creata
 //   4  cwd=$HOME e cwd in hive -> ancora rifiutate (gate invariato)
 //   5  /termina su cwd automatica -> .superpi/riassunto.md e condensato.json
-//   6  /termina su cwd esplicita -> nessun .superpi dentro la cwd di Luca
+//   6  /termina su cwd esplicita -> nessun .superpi dentro la cwd indicata
 //   7  Passo 0: la prima sottocartella mai vista non blocca il primo giro
 //      (verificato: cartelle nuove vuote NON innescano il trust prompt — il
 //      figlio parte senza -a e completa il primo giro).
@@ -39,7 +39,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const proc = spawn("node", [join(ROOT, "src", "server.mjs")], {
   cwd: ROOT,
-  env: { ...process.env, SUPERPI_PORT: String(PORT), SUPERPI_LAVORI_DIR: LAVORI_TEST, SUPERPI_GATE_QUOTA_FAKE: "1" },
+  env: { ...process.env, SUPERPI_PORT: String(PORT), SUPERPI_LAVORI_DIR: LAVORI_TEST, SUPERPI_PROTECTED_ROOT: join(homedir(), "hive"), SUPERPI_GATE_QUOTA_FAKE: "1" },
   stdio: ["ignore", "pipe", "pipe"],
 });
 let logServer = "";

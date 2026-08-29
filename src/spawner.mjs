@@ -1,5 +1,4 @@
-// Fase 1 — spawner: wrapping di RpcClient con identità decisa dal chiamante
-// e timeout configurabile (guida hive/appunti/superpi-guida-2026-08-10.md §4.1, §6 Fase 1).
+// Spawner: wraps Pi's RpcClient with caller-selected identity and timeouts.
 //
 // Ogni operazione (start/prompt/waitForIdle) è avvolta in un timeout esterno,
 // oltre a quelli interni di waitForIdle: bug noto — pi --mode rpc con le
@@ -19,6 +18,7 @@ const INDEX_PATH = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-
 const CLI_PATH = join(dirname(INDEX_PATH), "cli.js");
 
 // Timeout esterno su una promise: se scade, rifiuta e invoca onTimeout (es. stop()).
+// Il default operativo è Codex Luna: OpenCode Go è esaurito fino al reset.
 export function conTimeout(promise, ms, desc, onTimeout) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -42,8 +42,8 @@ export function creaFiglio({
   nome,
   sessionId,
   sessionDir,
-  provider = "opencode-go",
-  model = "deepseek-v4-flash",
+  provider = "openai-codex",
+  model = "gpt-5.6-luna",
   timeoutMs = 300000,
   resumeSessionId = null,
   extraArgs = [],
@@ -81,10 +81,51 @@ export async function attendiIdle(figlio, timeoutMs = figlio.timeoutMs) {
   );
 }
 
+// Invia un turno e aspetta lo stato idle. Il solo waitForIdle() può perdere
+// agent_settled se il giro termina tra prompt() e la sottoscrizione; il polling
+// successivo a prompt() osserva invece lo stato corrente fino alla stabilità.
+export async function promptEAttendi(figlio, messaggio, timeoutMs = figlio.timeoutMs) {
+  await promptFiglio(figlio, messaggio, timeoutMs);
+  const scadenza = Date.now() + timeoutMs;
+  // prompt() conferma il preflight prima che la generazione inizi: un primo
+  // getState() può quindi essere idle pur avendo il turno appena accodato.
+  // Osserva prima il passaggio attivo, poi accetta solo il ritorno a idle.
+  let vistoAttivo = false;
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  while (Date.now() < scadenza) {
+    const stato = await conTimeout(
+      figlio.client.getState(),
+      Math.min(5000, Math.max(100, scadenza - Date.now())),
+      `getState() del figlio ${figlio.nome}`,
+    );
+    const attivo = stato?.isStreaming === true || (stato?.pendingMessageCount ?? 0) > 0;
+    if (attivo) vistoAttivo = true;
+    if (vistoAttivo && !attivo) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`TIMEOUT ${timeoutMs}ms: il figlio ${figlio.nome} non è diventato idle`);
+}
+
 export async function fermaFiglio(figlio) {
   try {
     await conTimeout(figlio.client.stop(), 10000, `stop() del figlio ${figlio.nome}`);
   } catch {
     // processo già morto o stop già in corso: ok
   }
+}
+
+// getLastAssistantText() dell'SDK torna undefined sia per un vero bug (nessun
+// testo estratto da una risposta valida) sia per un errore a monte del
+// provider (quota esaurita, rate limit, ...): in entrambi i casi l'ultimo
+// messaggio assistente ha content vuoto. Senza questa distinzione un errore
+// di provider si presenta come "nessun testo assistente", indistinguibile da
+// un bug del harness — scoperto il 2026-08-20 con opencode-go in
+// GoUsageLimitError (429, quota settimanale esaurita).
+export function diagnosticaTestoMancante(messaggi) {
+  const ultimoAssistente = messaggi.slice().reverse().find((m) => m.role === "assistant");
+  if (!ultimoAssistente) return "nessun messaggio assistente ricevuto";
+  if (ultimoAssistente.stopReason === "error") {
+    return `errore del provider: ${ultimoAssistente.errorMessage ?? "motivo sconosciuto"}`;
+  }
+  return "nessun testo assistente (risposta vuota senza errore riportato dal provider)";
 }

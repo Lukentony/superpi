@@ -1,19 +1,40 @@
 {
   "name": "superpi",
-  "version": "1.0.0",
+  "version": "0.1.0-rc.1",
   "private": true,
   "type": "module",
-  "description": "A control plane for AI coding agent sessions: spawns, observes, and manages Pi coding agent children with a terminal-styled web interface.",
+  "description": "Experimental Linux application for supervising Pi coding-agent conversations over a local web UI.",
   "license": "MIT",
-  "author": "Luca Rivoiro",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lukentony/superpi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Lukentony/superpi/issues"
+  },
+  "homepage": "https://github.com/Lukentony/superpi#readme",
   "engines": {
     "node": ">=22.19.0"
   },
   "scripts": {
+    "start": "node src/server.mjs",
+    "test": "npm run check && npm run lint && npm run format:check && npm run test:unit && npm run test:integration",
+    "test:unit": "node scripts/test-ci.mjs",
+    "test:integration": "node scripts/test-integration.mjs",
+    "check": "node scripts/check.mjs",
+    "lint": "node scripts/lint.mjs",
+    "format:check": "node scripts/format-check.mjs",
+    "audit": "npm audit --omit=dev",
     "verify": "node scripts/passo0-rpcclient.mjs && node scripts/test-fase1.mjs && node scripts/test-fase2.mjs && node scripts/test-fase4.mjs && node scripts/test-fase5.mjs && node scripts/test-fase6.mjs",
-    "serve": "bash scripts/serve.sh"
+    "serve": "bash scripts/serve.sh",
+    "serve:stop": "bash scripts/stop-serve.sh",
+    "doctor": "node scripts/doctor.mjs",
+    "cleanup": "node scripts/cleanup-state.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.84.1"
+  },
+  "devDependencies": {
+    "eslint": "10.9.1"
   }
 }
