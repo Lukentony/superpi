@@ -32,7 +32,7 @@
     "cleanup": "node scripts/cleanup-state.mjs"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.84.1"
+    "@earendil-works/pi-coding-agent": "0.84.3"
   },
   "devDependencies": {
     "eslint": "10.9.1"
